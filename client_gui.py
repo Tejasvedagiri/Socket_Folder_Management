@@ -53,28 +53,28 @@ def getNextScreen(data):
     Button(DirList,text="Create Folder", height="2", width="30", command=createFodler).pack()
 
 
-
-try:
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect((SERVER, PORT))
-
-    
+def getMainScreen():
+    mainWindow = Toplevel(tkWindow) 
 
     #username label and text entry box
-    usernameLabel = Label(tkWindow, text="User Name").grid(row=0, column=0)
+    usernameLabel = Label(mainWindow, text="User Name").grid(row=0, column=0)
     username = StringVar()
-    usernameEntry = Entry(tkWindow, textvariable=username).grid(row=0, column=1)  
+    usernameEntry = Entry(mainWindow, textvariable=username).grid(row=0, column=1)  
 
     #password label and password entry box
-    passwordLabel = Label(tkWindow,text="Password").grid(row=1, column=0)  
+    passwordLabel = Label(mainWindow,text="Password").grid(row=1, column=0)  
     password = StringVar()
-    passwordEntry = Entry(tkWindow, textvariable=password, show='*').grid(row=1, column=1)  
+    passwordEntry = Entry(mainWindow, textvariable=password, show='*').grid(row=1, column=1)  
 
     validateLogin = partial(login, username, password)
 
     #login button
-    loginButton = Button(tkWindow, text="Login", command=validateLogin).grid(row=4, column=0)  
+    loginButton = Button(mainWindow, text="Login", command=validateLogin).grid(row=4, column=0)  
 
+try:
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect((SERVER, PORT))
+    getMainScreen()
     tkWindow.mainloop()
 except:
     print("God Dam it!")

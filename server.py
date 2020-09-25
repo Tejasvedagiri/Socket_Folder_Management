@@ -40,8 +40,12 @@ class ClientThread(threading.Thread):
         while True:
             data = self.csocket.recv(2048)
             msg = data.decode()
-            print(msg)
-            data = json.loads(msg)
+            if len(msg) != 0 :
+                data = json.loads(msg)
+            else:
+                data = {}
+                data['action'] = 'new'
+            
             if data['action'] =='TERMINATE':
                 self.closeClient()
                 self.dbUtils.close()
@@ -54,6 +58,8 @@ class ClientThread(threading.Thread):
             elif data['action'] == 'CREATEFOLDER':
                 out = self.osUtils.createFolder(data)
                 self.csocket.send(bytes(json.dumps(out),'UTF-8'))
+            elif data['action'] == 'new':
+                pass
             else:
                 print("Invalid Input")
                 self.closeClient()
