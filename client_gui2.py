@@ -43,10 +43,14 @@ class SampleApp(tk.Tk):
         self.client.close()
 
     def logOut(self,content):
-        content['action'] = 'LOGOUT'
-        self.client.sendall(bytes(json.dumps(content),'UTF-8'))
-        self.client.close()
-        exit()
+        try:
+            content['action'] = 'LOGOUT'
+            self.client.sendall(bytes(json.dumps(content),'UTF-8'))
+            in_data =  self.client.recv(1024)
+            data = json.loads(in_data.decode())
+            return data['message']
+        except:
+            return "Logged Out Failed"
 
     def show_frame(self, page_name,content):
         if page_name == 'CreateUser':
@@ -65,6 +69,7 @@ class SampleApp(tk.Tk):
             page_name = 'PageOne'
             self.data = self.createF(content)
         frame = self.frames[page_name]
+        print("Going to " + page_name)
         frame.draw(self.data)
         frame.tkraise()
 
@@ -84,7 +89,6 @@ class SampleApp(tk.Tk):
         self.client.sendall(bytes(json.dumps(data),'UTF-8'))
         in_data =  self.client.recv(1024)
         data = json.loads(in_data.decode())
-        print(data)
         return data
 
     def login(self, userName):
@@ -94,7 +98,6 @@ class SampleApp(tk.Tk):
         self.client.sendall(bytes(json.dumps(data),'UTF-8'))
         in_data =  self.client.recv(1024)
         data = json.loads(in_data.decode())
-        print(data)
         return data
 
     def createF(self, folderName):
@@ -147,18 +150,16 @@ class PageOne(tk.Frame):
         tk.Entry(self, textvariable=createDir).pack()
 
         tk.Button(self,text="Create Folder", command=lambda: self.controller.show_frame("CreateFolder",createDir.get())).pack()
-        tk.Button(self,text="Log Out and exit", command=lambda: self.controller.show_frame("LOGOUT",self.userName)).pack()
+        tk.Button(self,text="Log Out", command=lambda: self.controller.show_frame("LOGOUT",self.userName)).pack()
 
         self.draw({})
 
     def draw(self, data):
         self.userName = data
-        print("TEJAS")
         self.userName = data
         self.Lb.delete(0,tk.END)
         if bool(data): 
             for i,contents in enumerate(data['dir']):
-                print(i)
                 self.Lb.insert(i,contents)
         
 

@@ -63,8 +63,7 @@ class ClientThread(threading.Thread):
             elif data['action'] == 'LOGOUT':
                 rec = (data['userName'],)
                 self.dbUtils.logOut(rec)
-                self.dbUtils.close()
-                break
+                self.csocket.send(bytes(json.dumps({'message' :"SUCCESFULL"}),'UTF-8'))
             elif data['action'] == 'LOGIN':
                 print("HERE")
                 rec = (data['userName'],)
@@ -112,7 +111,7 @@ class DBUtils():
         user_dict = {}
         user_dict['message'] = 'LOGIN FAILED'
         c = self.con.cursor()
-        c.execute("SELECT * from USER where name = ?",rec)
+        c.execute("SELECT * from USER where name = ? AND logged_in = 0",rec)
         data = c.fetchall()
         c.execute("UPDATE USER set logged_in = 1 where name = ?",rec)
         self.con.commit()
@@ -217,14 +216,15 @@ class Redraw(threading.Thread):
         self.STOP = False
 
     def run(self):
-        print("HERE")
-        while not self.STOP:
-            self.LB.delete(0,tk.END)
-            for i,contents in enumerate(self.dbUtils.getLoggedUserNames()):
-                print(contents)
-                self.LB.insert(i,contents[0])
-            time.sleep(2)
-        print("Stopped re Draw thread")
+        try:
+            while not self.STOP:
+                self.LB.delete(0,tk.END)
+                for i,contents in enumerate(self.dbUtils.getLoggedUserNames()):
+                    print(contents)
+                    self.LB.insert(i,contents[0])
+                time.sleep(2)
+        except:
+            print("Stopped re Draw thread")
     def stop(self):
         self.STOP = True
 
@@ -242,16 +242,17 @@ class Server(threading.Thread):
         self.server.bind((HOST, PORT))
         print("Server started")
         print("Waiting for client request..")
-        while not self.STOP:
-            self.server.listen(10)
-            print("LLL")
-            clientsock, clientAddress = self.server.accept()
-            newthread = ClientThread(clientAddress, clientsock)
-            newthread.start()
-        print("Socket Server Stopped")
-
+        try:
+            while not self.STOP:
+                self.server.listen(10)
+                print("LLL")
+                clientsock, clientAddress = self.server.accept()
+                newthread = ClientThread(clientAddress, clientsock)
+                newthread.start()
+        except:
+            print("Socket Server Stopped")
+        
     def stop(self):
-        print("YES")
         self.server.close()
 
 if __name__ == "__main__":
