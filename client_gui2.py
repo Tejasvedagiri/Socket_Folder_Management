@@ -2,6 +2,12 @@ import tkinter as tk
 from tkinter import font as tkfont  
 import socket 
 import json
+import threading
+import os
+import re
+
+ignore_char = ['\\','!','@','&',';','%']
+regex = re.compile('[0-9,!,@,%,;,=,-,~,`,?,>,<,\/,\\\]')
 
 class SampleApp(tk.Tk):
 
@@ -55,23 +61,71 @@ class SampleApp(tk.Tk):
     def show_frame(self, page_name,content):
         if page_name == 'CreateUser':
             page_name = 'StartPage'
-            x = self.createUser(content)
-            self.popupmsg(x['message'])
+            if (bool(regex.match(content))):
+                th = threading.Thread(target=self.popupmsg,args=["Invalid Char"])
+            else :
+                x = self.createUser(content)
+                th = threading.Thread(target=self.popupmsg,args=[x['message']])
+            th.start()
+        elif page_name == 'DeleteFolder':
+            page_name = 'PageOne'
+            if (bool(regex.match(content))):
+                th = threading.Thread(target=self.popupmsg,args=["Invalid Char"])
+            else:
+                self.data = self.deleteF(content)
+                th = threading.Thread(target=self.popupmsg,args=[self.data['message']])
+            th.start()
         elif page_name == 'PageOne':
             self.data = self.login(content)
             if self.data['message'] == 'LOGIN FAILED':
                 page_name = 'StartPage'
                 self.popupmsg("LOGIN Failed")
+        elif page_name == 'MoveFolder':
+            page_name = 'PageOne'
+            if (bool(regex.match(content))):
+                th = threading.Thread(target=self.popupmsg,args=["Invalid Char"])
+            else:
+                self.data = self.moveF(content)
+                th = threading.Thread(target=self.popupmsg,args=[self.data['message']])
+            th.start()
+        elif page_name == 'RenameFolder':
+            page_name = 'PageOne'
+            if (bool(regex.match(content))):
+                th = threading.Thread(target=self.popupmsg,args=["Invalid Char"])
+            else:
+                self.data = self.renameF(content)
+                th = threading.Thread(target=self.popupmsg,args=[self.data['message']])
+            th.start()
+        elif page_name == 'MoveIntoFolder':
+            page_name = 'PageOne'
+            self.data = self.MoveIntoFolder(self.data,content)
         elif page_name == 'LOGOUT':
             page_name = 'StartPage'
             self.logOut(content)
         elif page_name == 'CreateFolder':
             page_name = 'PageOne'
-            self.data = self.createF(content)
+            if (bool(regex.match(content))):
+                th = threading.Thread(target=self.popupmsg,args=["Invalid Char"])
+            else:
+                self.data = self.createF(content)
+                th = threading.Thread(target=self.popupmsg,args=[self.data['message']])
+            th.start()
         frame = self.frames[page_name]
         print("Going to " + page_name)
         frame.draw(self.data)
         frame.tkraise()
+
+    def MoveIntoFolder(self,data,content):
+        if content == "..":
+            self.data['currentPath'] = os.path.split(data['currentPath'])[0]
+        else :
+            self.data['currentPath'] = os.path.join( data['currentPath'], content)
+        self.data['action'] = 'MOVEINTOFOLDER'
+        self.client.sendall(bytes(json.dumps(self.data),'UTF-8'))
+        in_data =  self.client.recv(1024)
+        self.data = json.loads(in_data.decode())
+        print(self.data)
+        return self.data
 
     def popupmsg(self,msg):
         popup = tk.Tk()
@@ -97,12 +151,40 @@ class SampleApp(tk.Tk):
         data['action'] = 'LOGIN'
         self.client.sendall(bytes(json.dumps(data),'UTF-8'))
         in_data =  self.client.recv(1024)
-        data = json.loads(in_data.decode())
-        return data
+        self.data = json.loads(in_data.decode())
+        return self.data
 
     def createF(self, folderName):
         self.data['folderName'] = folderName
         self.data['action'] = 'CREATEFOLDER'
+        print(self.data)
+        print("TEJAS")
+        self.client.sendall(bytes(json.dumps(self.data),'UTF-8'))
+        in_data =  self.client.recv(1024)
+        self.data = json.loads(in_data.decode())
+        return self.data
+
+    def moveF(self, content):
+        self.data['inputdir'] = content['inputdir']
+        self.data['targetdir'] = content['targetdir']
+        self.data['action'] = 'MOVEFOLDER'
+        self.client.sendall(bytes(json.dumps(self.data),'UTF-8'))
+        in_data =  self.client.recv(1024)
+        self.data = json.loads(in_data.decode())
+        return self.data
+
+    def renameF(self, content):
+        self.data['inputdir'] = content['inputdir']
+        self.data['targetdir'] = content['targetdir']
+        self.data['action'] = 'RENAMEFOLDER'
+        self.client.sendall(bytes(json.dumps(self.data),'UTF-8'))
+        in_data =  self.client.recv(1024)
+        self.data = json.loads(in_data.decode())
+        return self.data
+    
+    def deleteF(self, content):
+        self.data['folderName'] = content
+        self.data['action'] = 'DELETEFOLDER'
         self.client.sendall(bytes(json.dumps(self.data),'UTF-8'))
         in_data =  self.client.recv(1024)
         self.data = json.loads(in_data.decode())
@@ -143,26 +225,40 @@ class PageOne(tk.Frame):
         self.controller = controller
         self.Lb = tk.Listbox(self)
         self.Lb.pack() 
-
+        self.Lb.bind('<Double-1>', self.click) 
         self.userName = ""
         tk.Label(self, text="Create Folder").pack()
         createDir = tk.StringVar()
         tk.Entry(self, textvariable=createDir).pack()
 
         tk.Button(self,text="Create Folder", command=lambda: self.controller.show_frame("CreateFolder",createDir.get())).pack()
+        tk.Button(self,text="Delete Folder", command=lambda: self.controller.show_frame("DeleteFolder",createDir.get())).pack()
+        textBox = tk.Label(self,height = 10, width = 30) # specify the column also
+        tk.Label(self, text="Input Dir").pack()
+        inpdir = tk.StringVar()
+        tk.Entry(self, textvariable=inpdir).pack()
+        tk.Label(self, text="Target Dir").pack()
+        tardir = tk.StringVar()
+        tk.Entry(self, textvariable=tardir).pack()
+        tk.Button(self,text="Move Folder", command=lambda: self.controller.show_frame("MoveFolder",{"inputdir":inpdir.get(),"targetdir":tardir.get()})).pack()
+        tk.Button(self,text="Rename Folder", command=lambda: self.controller.show_frame("RenameFolder",{"inputdir":inpdir.get(),"targetdir":tardir.get()})).pack()
         tk.Button(self,text="Log Out", command=lambda: self.controller.show_frame("LOGOUT",self.userName)).pack()
 
         self.draw({})
 
     def draw(self, data):
         self.userName = data
-        self.userName = data
         self.Lb.delete(0,tk.END)
         if bool(data): 
             for i,contents in enumerate(data['dir']):
                 self.Lb.insert(i,contents)
         
-
+    def click(self,event):
+        w = event.widget
+        index = int(w.curselection()[0])
+        value = w.get(index)
+        self.controller.show_frame("MoveIntoFolder",value)
+        print(index, value)
         
 
 class PageTwo(tk.Frame):

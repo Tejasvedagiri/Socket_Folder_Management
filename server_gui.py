@@ -6,6 +6,7 @@ import sqlite3
 import threading
 import os
 import time
+import shutil  
 
 class OSUtils():
     def __init__(self):
@@ -13,18 +14,75 @@ class OSUtils():
         if not os.path.exists(self.base_path):
             os.mkdir(self.base_path)  
 
+    def moveIntoFolder(self,data):
+        path = os.path.join(self.base_path ,  data['userName'], data['currentPath'])
+        x = []
+        if not data['currentPath'] == "":
+            x.append('..')
+        x.extend(os.listdir(path))
+        data['dir'] = x
+        return data
+
     def getUserDir(self,data): 
-        path = os.path.join(self.base_path ,  data['userName'])
+        path = os.path.join(self.base_path ,  data['userName'], data['currentPath'])
         if not os.path.exists(path):
             os.mkdir(path)    
         x = os.listdir(path)
+        if not data['currentPath'] == "":
+            x.append('..')
         return x
 
     def createFolder(self,data):
-        path = os.path.join(self.base_path , data['userName'], data['folderName'])
+        path = os.path.join(self.base_path , data['userName'], data['currentPath'],data['folderName'])
         if not os.path.exists(path):
             os.mkdir(path)  
-        data['message'] = "Created succefully"
+            data['message'] = "Created succefully"
+        else :
+            data['message'] = "Folder Exisit"
+        data['dir'] = self.getUserDir(data)
+        return data
+
+    def moveFolder(self,data):
+        inpath = os.path.join(self.base_path , data['userName'], data['currentPath'],data['inputdir'])
+        targetpath = os.path.join(self.base_path , data['userName'], data['currentPath'], data['targetdir'])
+        if not os.path.exists(inpath):
+            data['message'] = "Input path does not exsist"
+            return data
+        if not os.path.exists(targetpath): 
+            data['message'] = "Target Dir does not exsist"
+            return data
+        try:
+            shutil.move(inpath, targetpath)  
+            data['message'] = "Moved Succefull"
+            data['dir'] = self.getUserDir(data)
+            return data
+        except:
+            data['message'] = "Failed to move"
+            data['dir'] = self.getUserDir(data)
+            return data
+
+    def renameFolder(self,data):
+        inpath = os.path.join(self.base_path , data['userName'], data['currentPath'], data['inputdir'])
+        targetpath = os.path.join(self.base_path , data['userName'], data['currentPath'], data['targetdir'])
+        if not os.path.exists(inpath):
+            data['message'] = "Input path does not exsist"
+            return data
+        if os.path.exists(targetpath): 
+            data['message'] = "Target Dir already exsist"
+            return data
+        shutil.move(inpath, targetpath)  
+        data['message'] = "Rename Succefull"
+        data['dir'] = self.getUserDir(data)
+        return data
+
+    def deleteFolder(self,data):
+        path = os.path.join(self.base_path , data['userName'], data['currentPath'], data['folderName'])
+        print("HERE")
+        if os.path.exists(path):
+            os.rmdir(path)  
+            data['message'] = "Deleted folder succefully"
+        else :
+            data['message'] = "Folder not found"
         data['dir'] = self.getUserDir(data)
         return data
 
@@ -56,6 +114,15 @@ class ClientThread(threading.Thread):
                 self.closeClient()
                 self.dbUtils.close()
                 break
+            elif data['action'] == 'DELETEFOLDER':
+                out = self.osUtils.deleteFolder(data)
+                self.csocket.send(bytes(json.dumps(out),'UTF-8'))
+            elif data['action'] == 'MOVEFOLDER':
+                out = self.osUtils.moveFolder(data)
+                self.csocket.send(bytes(json.dumps(out),'UTF-8'))
+            elif data['action'] == 'RENAMEFOLDER':
+                out = self.osUtils.renameFolder(data)
+                self.csocket.send(bytes(json.dumps(out),'UTF-8'))
             elif data['action'] == 'CREATEUSER':
                 rec = (data['userName'],)
                 out = self.dbUtils.createUser(rec)
@@ -64,11 +131,14 @@ class ClientThread(threading.Thread):
                 rec = (data['userName'],)
                 self.dbUtils.logOut(rec)
                 self.csocket.send(bytes(json.dumps({'message' :"SUCCESFULL"}),'UTF-8'))
+            elif data['action'] == 'MOVEINTOFOLDER':
+                out= self.osUtils.moveIntoFolder(data)
+                self.csocket.send(bytes(json.dumps(out),'UTF-8'))
             elif data['action'] == 'LOGIN':
-                print("HERE")
                 rec = (data['userName'],)
                 out = self.dbUtils.getUser(rec)
-                print(out)
+                data['currentPath'] = ""
+                out['currentPath'] = ""
                 out['dir'] = self.osUtils.getUserDir(data)
                 self.csocket.send(bytes(json.dumps(out),'UTF-8'))
             elif data['action'] == 'CREATEFOLDER':
@@ -93,11 +163,9 @@ class DBUtils():
         #self.test()
 
     def create_tables(self):
-        
         c = self.con.cursor()
         c.execute('CREATE TABLE IF NOT EXISTS USER (name text PRIMARY KEY,logged_in tinyint)')
         self.con.commit()
-        print("TABLE CREATED")
     
     def test(self):
         c = self.con.cursor()
@@ -196,7 +264,7 @@ class StartPage(tk.Frame):
                             command=self.stopThread)
         self.Lb = tk.Listbox(self)
         self.Lb.pack() 
-
+        
         self.Redraw = Redraw(self.Lb)
         self.Redraw.start()
         button2.pack()
