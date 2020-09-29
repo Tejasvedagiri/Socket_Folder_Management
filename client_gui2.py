@@ -42,17 +42,50 @@ class SampleApp(tk.Tk):
         self.client.sendall(bytes(json.dumps(data),'UTF-8'))
         self.client.close()
 
+    def logOut(self,content):
+        content['action'] = 'LOGOUT'
+        self.client.sendall(bytes(json.dumps(content),'UTF-8'))
+        self.client.close()
+        exit()
+
     def show_frame(self, page_name,content):
-        if page_name == 'PageOne':
+        if page_name == 'CreateUser':
+            page_name = 'StartPage'
+            x = self.createUser(content)
+            self.popupmsg(x['message'])
+        elif page_name == 'PageOne':
             self.data = self.login(content)
-        if page_name == 'CreateFolder':
+            if self.data['message'] == 'LOGIN FAILED':
+                page_name = 'StartPage'
+                self.popupmsg("LOGIN Failed")
+        elif page_name == 'LOGOUT':
+            page_name = 'StartPage'
+            self.logOut(content)
+        elif page_name == 'CreateFolder':
             page_name = 'PageOne'
             self.data = self.createF(content)
         frame = self.frames[page_name]
-        print("HERE")
-        print(self.data)
         frame.draw(self.data)
         frame.tkraise()
+
+    def popupmsg(self,msg):
+        popup = tk.Tk()
+        popup.wm_title("!")
+        label = tk.Label(popup, text=msg)
+        label.pack(side="top", fill="x", pady=10)
+        B1 = tk.Button(popup, text="Okay", command = popup.destroy)
+        B1.pack()
+        popup.mainloop()
+
+    def createUser(self,userName):
+        data = {}
+        data['userName'] = userName
+        data['action'] = 'CREATEUSER'
+        self.client.sendall(bytes(json.dumps(data),'UTF-8'))
+        in_data =  self.client.recv(1024)
+        data = json.loads(in_data.decode())
+        print(data)
+        return data
 
     def login(self, userName):
         data = {}
@@ -61,6 +94,7 @@ class SampleApp(tk.Tk):
         self.client.sendall(bytes(json.dumps(data),'UTF-8'))
         in_data =  self.client.recv(1024)
         data = json.loads(in_data.decode())
+        print(data)
         return data
 
     def createF(self, folderName):
@@ -87,8 +121,14 @@ class StartPage(tk.Frame):
         usernameEntry.pack() 
         button1 = tk.Button(self, text="Login",
                             command=lambda: controller.show_frame("PageOne",username.get()))
+        button3 = tk.Button(self, text="Create User",
+                            command=lambda: controller.show_frame("CreateUser",username.get()))
+        button2 = tk.Button(self, text="Exit",
+                            command=exit)
         
         button1.pack()
+        button3.pack()
+        button2.pack()
 
     def draw(self,data):
         pass
@@ -101,17 +141,20 @@ class PageOne(tk.Frame):
         self.Lb = tk.Listbox(self)
         self.Lb.pack() 
 
-
+        self.userName = ""
         tk.Label(self, text="Create Folder").pack()
         createDir = tk.StringVar()
         tk.Entry(self, textvariable=createDir).pack()
 
         tk.Button(self,text="Create Folder", command=lambda: self.controller.show_frame("CreateFolder",createDir.get())).pack()
-        tk.Button(self,text="Log Out", command=lambda: self.controller.show_frame("StartPage","")).pack()
+        tk.Button(self,text="Log Out and exit", command=lambda: self.controller.show_frame("LOGOUT",self.userName)).pack()
 
         self.draw({})
 
     def draw(self, data):
+        self.userName = data
+        print("TEJAS")
+        self.userName = data
         self.Lb.delete(0,tk.END)
         if bool(data): 
             for i,contents in enumerate(data['dir']):
